@@ -1,0 +1,7 @@
+/build*/
+/.tools/
+/.downloads/
+/.vs/
+*.user
+/screenshots/
+/docs/screenshots/*.bmp
