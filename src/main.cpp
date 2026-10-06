@@ -3,9 +3,11 @@
 #include "Lighting.h"
 #include "Scene.h"
 #include "Verification.h"
+#include "Hud.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -24,7 +26,8 @@ static void updateTitle(GLFWwindow* window, const AppState& app) {
     std::string title="My Smart Study Bedroom | ";
     title += modeName(app.shading);
     title += app.camera.overview ? " | Overview" : " | Interior";
-    title += " | 1/2/3 shading | V overview | Tab mouse | R reset";
+    title += app.simulation.paused ? " | PAUSED" : " | LIVE";
+    title += " | H controls | 1/2/3 shading | N day/night";
     glfwSetWindowTitle(window,title.c_str());
 }
 
@@ -33,9 +36,28 @@ void handleKey(GLFWwindow* window, int key, int action) {
     auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if(key>=GLFW_KEY_1 && key<=GLFW_KEY_3) app.shading=static_cast<ShadingMode>(key-GLFW_KEY_1);
     if(key==GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window,GLFW_TRUE);
-    if(key==GLFW_KEY_R) app.camera.reset();
-    if(key==GLFW_KEY_V) app.camera.toggleOverview();
+    if(key==GLFW_KEY_R) { app.tour=false; app.camera.reset(); }
+    if(key==GLFW_KEY_V) { app.tour=false; app.camera.toggleOverview(); }
     if(key==GLFW_KEY_F12) app.screenshotRequested=true;
+    auto& s=app.simulation;
+    if(key==GLFW_KEY_F) s.fanOn=!s.fanOn;
+    if(key==GLFW_KEY_O) s.doorOpen=!s.doorOpen;
+    if(key==GLFW_KEY_C) s.curtainsOpen=!s.curtainsOpen;
+    if(key==GLFW_KEY_U) s.wardrobeOpen=!s.wardrobeOpen;
+    if(key==GLFW_KEY_J) s.drawerOpen=!s.drawerOpen;
+    if(key==GLFW_KEY_M) s.laptopOpen=!s.laptopOpen;
+    if(key==GLFW_KEY_L) s.ceilingLight=!s.ceilingLight;
+    if(key==GLFW_KEY_B) s.bedsideLight=!s.bedsideLight;
+    if(key==GLFW_KEY_K) s.studyLight=!s.studyLight;
+    if(key==GLFW_KEY_N) s.toggleDayNight();
+    if(key==GLFW_KEY_T) s.dayCycle=!s.dayCycle;
+    if(key==GLFW_KEY_G) s.weather=s.weather==Weather::Clear ? Weather::Rain : Weather::Clear;
+    if(key==GLFW_KEY_P) s.paused=!s.paused;
+    if(key==GLFW_KEY_H) app.showHelp=!app.showHelp;
+    if(key==GLFW_KEY_SPACE) {
+        app.tour=!app.tour; app.tourTime=0;
+        if(app.tour) app.camera.reset();
+    }
     if(key==GLFW_KEY_TAB) {
         app.captured=!app.captured;
         app.firstMouse=true;
@@ -48,22 +70,46 @@ void mouseMoved(GLFWwindow* window, double x, double y) {
     auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
     if(!app.captured) return;
     if(app.firstMouse) { app.lastX=x; app.lastY=y; app.firstMouse=false; return; }
+    app.tour=false;
     app.camera.look(static_cast<float>(x-app.lastX),static_cast<float>(app.lastY-y));
     app.lastX=x; app.lastY=y;
 }
 void scrolled(GLFWwindow* window, double y) {
-    static_cast<AppState*>(glfwGetWindowUserPointer(window))->camera.zoom(static_cast<float>(y));
+    auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    app.tour=false;
+    app.camera.zoom(static_cast<float>(y));
 }
 
 static void processMovement(GLFWwindow* window, AppState& app, float dt) {
     if(!glfwGetWindowAttrib(window,GLFW_FOCUSED)) return;
     auto pressed=[&](int key) { return glfwGetKey(window,key)==GLFW_PRESS ? 1.0f : 0.0f; };
-    app.camera.move(pressed(GLFW_KEY_W)-pressed(GLFW_KEY_S),pressed(GLFW_KEY_D)-pressed(GLFW_KEY_A),
-                    pressed(GLFW_KEY_E)-pressed(GLFW_KEY_Q),dt);
+    float ahead=pressed(GLFW_KEY_W)-pressed(GLFW_KEY_S), right=pressed(GLFW_KEY_D)-pressed(GLFW_KEY_A);
+    float up=pressed(GLFW_KEY_E)-pressed(GLFW_KEY_Q);
+    if(ahead!=0 || right!=0 || up!=0) app.tour=false;
+    app.camera.move(ahead,right,up,dt);
+}
+
+void updateApplication(AppState& app, float dt) {
+    if(!std::isfinite(dt) || dt<=0) return;
+    app.simulation.update(dt);
+    if (!app.tour || app.simulation.paused) return;
+    app.tourTime=std::fmod(app.tourTime+dt,32.0);
+    const glm::vec3 positions[]={{2.65f,1.85f,2.60f},{0.5f,1.8f,2.35f},
+                                {0.6f,1.65f,0.1f},{1.0f,2.0f,1.95f},{2.65f,1.85f,2.60f}};
+    const glm::vec3 targets[]={{0,1.05f,-1},{-1.8f,0.8f,-0.45f},
+                              {1.9f,1.1f,-2.2f},{-0.3f,1.6f,-2.2f},{0,1.05f,-1}};
+    const int segment=static_cast<int>(app.tourTime/8.0);
+    float t=static_cast<float>(app.tourTime/8.0-segment);
+    t=t*t*(3-2*t);
+    app.camera.overview=false;
+    app.camera.fov=76;
+    app.camera.position=glm::mix(positions[segment],positions[segment+1],t);
+    app.camera.lookAt(glm::mix(targets[segment],targets[segment+1],t));
 }
 
 struct Options {
     bool verify=false;
+    bool night=false, rain=false, noHud=false;
     std::filesystem::path capture;
     std::filesystem::path shaders;
     std::string view="interior";
@@ -76,6 +122,9 @@ static Options parseOptions(int argc,char** argv) {
     for(int i=1;i<argc;++i) {
         const std::string arg=argv[i];
         if(arg=="--verify") result.verify=true;
+        else if(arg=="--night") result.night=true;
+        else if(arg=="--rain") result.rain=true;
+        else if(arg=="--no-hud") result.noHud=true;
         else if(i+1<argc && arg=="--capture") result.capture=argv[++i];
         else if(i+1<argc && arg=="--shaders") result.shaders=argv[++i];
         else if(i+1<argc && arg=="--view") result.view=argv[++i];
@@ -93,6 +142,9 @@ static Options parseOptions(int argc,char** argv) {
 static void runApplication(GLFWwindow* window,const Options& options) {
     AppState app;
     app.shading=options.mode;
+    app.showHud=!options.noHud;
+    if(options.night) { app.simulation.hour=22; app.simulation.dayCycle=false; }
+    if(options.rain) app.simulation.weather=Weather::Rain;
     if(options.view=="overview") app.camera.toggleOverview();
     else if(options.view=="bedroom") {
         app.camera.position={0.50f,1.8f,2.35f}; app.camera.lookAt({-1.8f,0.8f,-0.45f});
@@ -113,6 +165,7 @@ static void runApplication(GLFWwindow* window,const Options& options) {
         shaders[i]=std::make_unique<Shader>(options.shaders/(names[i]+".vert"),options.shaders/(names[i]+".frag"));
     Shader unlit(options.shaders/"unlit.vert",options.shaders/"unlit.frag");
     Primitives primitives;
+    Hud hud;
     std::cout << "All four shader programs linked. Primitive uploads: " << Mesh::uploads << '\n';
     unsigned int drawCalls=0;
     auto render=[&]() {
@@ -120,16 +173,18 @@ static void runApplication(GLFWwindow* window,const Options& options) {
         glfwGetFramebufferSize(window,&width,&height);
         if(width<=0 || height<=0) return;
         glViewport(0,0,width,height);
-        glClearColor(0.12f,0.15f,0.18f,1);
+        const auto sky=app.simulation.skyColor()*0.30f;
+        glClearColor(sky.r,sky.g,sky.b,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         auto projection=glm::perspective(glm::radians(app.camera.fov),float(width)/height,0.05f,50.0f);
         Shader& lit=*shaders[static_cast<size_t>(app.shading)];
         lit.use(); lit.set("view",app.camera.view()); lit.set("projection",projection);
-        uploadLighting(lit,app.camera.position);
+        uploadLighting(lit,app.camera.position,app.simulation);
         unlit.use(); unlit.set("view",app.camera.view()); unlit.set("projection",projection);
-        DrawContext ctx{primitives,lit,unlit,app.shading==ShadingMode::Flat};
+        DrawContext ctx{primitives,lit,unlit,app.shading==ShadingMode::Flat,app.simulation};
         drawScene(ctx,app.camera.overview);
         drawCalls=ctx.drawCalls;
+        if(app.showHud) hud.draw(unlit,app,width,height);
     };
     if(options.verify) {
         verifyApplication(window,app,render,"docs/screenshots");
@@ -139,7 +194,10 @@ static void runApplication(GLFWwindow* window,const Options& options) {
         saveScreenshot(options.capture,width,height);
     } else {
         std::cout << "WASD move | Q/E down/up | Tab capture/release mouse | Wheel zoom\n"
-                  << "1 Flat | 2 Gouraud | 3 Phong | V overview | R reset | F12 screenshot | Esc exit\n";
+                  << "1 Flat | 2 Gouraud | 3 Phong | V overview | R reset | F12 screenshot | Esc exit\n"
+                  << "F fan | O door | C curtains | U wardrobe | J drawer | M laptop\n"
+                  << "L ceiling | B bedside | K study lamp | N day/night | T day cycle | G weather\n"
+                  << "P pause | Space camera tour | H help\n";
         double lastTime=glfwGetTime();
         while(!glfwWindowShouldClose(window)) {
             double now=glfwGetTime();
@@ -147,6 +205,7 @@ static void runApplication(GLFWwindow* window,const Options& options) {
             glfwPollEvents(); processMovement(window,app,dt);
             int width=0,height=0; glfwGetFramebufferSize(window,&width,&height);
             if(width<=0 || height<=0) { glfwWaitEventsTimeout(0.05); continue; }
+            updateApplication(app,dt);
             render();
             if(app.screenshotRequested) {
                 saveScreenshot(std::filesystem::path("screenshots")/(std::string(modeName(app.shading))+"-"+std::to_string(static_cast<int>(now*1000))+".bmp"),width,height);

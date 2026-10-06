@@ -87,8 +87,24 @@ static MeshData cylinderMesh(float topRadius) {
     return data;
 }
 
+static MeshData curtainMesh() {
+    MeshData data;
+    constexpr unsigned int columns=96, rows=16;
+    const float frequency=glm::two_pi<float>()*8;
+    for(unsigned int y=0;y<=rows;++y) for(unsigned int x=0;x<=columns;++x) {
+        const float u=float(x)/columns, v=float(y)/rows;
+        const float wave=frequency*u;
+        const glm::vec3 point{u-0.5f,0.5f-v+0.012f*std::cos(wave)*v*v*v*v,0.05f*std::sin(wave)};
+        const glm::vec3 tangentU{1,-0.012f*frequency*std::sin(wave)*v*v*v*v,0.05f*frequency*std::cos(wave)};
+        const glm::vec3 tangentV{0,-1+0.048f*std::cos(wave)*v*v*v,0};
+        data.vertices.push_back({point,glm::normalize(glm::cross(tangentV,tangentU))});
+    }
+    gridIndices(data,0,columns,rows);
+    return data;
+}
+
 Primitives::Primitives() : box(boxMesh(false)), roundedBox(boxMesh(true)), sphere(sphereMesh()),
-    cylinder(cylinderMesh(0.5f)), frustum(cylinderMesh(0.28f)) {}
+    cylinder(cylinderMesh(0.5f)), frustum(cylinderMesh(0.28f)), curtain(curtainMesh()) {}
 
 glm::mat4 transform(const glm::mat4& parent, glm::vec3 position, glm::vec3 size, float angle, glm::vec3 axis) {
     // Parent * translation * rotation * scale: local parts move with their object.

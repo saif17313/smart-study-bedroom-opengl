@@ -2,9 +2,10 @@
 #include "Mesh.h"
 #include "Material.h"
 #include "Shader.h"
+#include "Simulation.h"
 
 struct Primitives {
-    Mesh box, roundedBox, sphere, cylinder, frustum;
+    Mesh box, roundedBox, sphere, cylinder, frustum, curtain;
     Primitives();
 };
 
@@ -14,6 +15,7 @@ struct DrawContext {
     Shader& lit;
     Shader& unlit;
     bool flat;
+    const Simulation& simulation;
     unsigned int drawCalls = 0;
 };
 

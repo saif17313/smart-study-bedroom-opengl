@@ -1,91 +1,96 @@
-# My Smart Study Bedroom — Phase 1 Lite Demo
+# My Smart Study Bedroom — Phase 2 Interactive Demo
 
-A simplified initial progress demonstration for the teacher, using the existing **C++17, OpenGL 3.3 Core Profile, GLFW, GLAD and GLM** project. The room keeps basic models, camera navigation and three shading modes. Advanced lighting and animation are deferred.
+The second half of the project extends the original `17936e1` Phase 1 demo with animation, object controls, multiple lights, weather and a day/night cycle. It keeps C++17, OpenGL 3.3 Core Profile, GLFW, GLAD and GLM, with no new dependencies.
 
-![Phase 1 Lite Demo in Phong shading](docs/screenshots/Phong.png)
+![Interactive bedroom in Phong shading](docs/screenshots/Phong.png)
 
 ## Build and run
 
-From the project folder in VS Code's PowerShell terminal:
+From the project folder in PowerShell:
 
 ```powershell
 .\build.bat
 .\run.bat
 ```
 
-You can also double-click these files. Once built, `run.bat` starts the current demo. The existing MSYS2 UCRT64 GCC/CMake/Ninja toolchain is used, and dependencies are stored locally in `external/`.
+The build script uses the existing MSYS2 UCRT64 GCC/CMake/Ninja toolchain. Dependencies are vendored in `external/`. You can also double-click the batch files. Keep the executable and its sibling `shaders/` directory together when copying the application.
 
-Equivalent CMake commands:
+## Controls
 
-```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel 4
-.\build\smart_study_bedroom.exe
-```
-
-Keep the executable and its sibling `shaders/` folder together when copying the application. Building requires a C/C++17 compiler, CMake 3.20+, Ninja and an OpenGL 3.3-capable driver; no internet or Python is needed. Windows is the tested platform.
-
-## Controls (unchanged)
-
-Click the window to focus it. Press **Tab** to enable mouse look.
+Click the window to focus it. The on-screen panel shows the controls and current light/environment state; **H** shows or hides the help panel.
 
 | Input | Action |
 | --- | --- |
-| W / A / S / D | Move |
-| Q / E | Down / up |
+| W / A / S / D | Move camera |
+| Q / E | Move down / up |
 | Tab + mouse | Capture/release pointer and look around |
 | Mouse wheel | Zoom |
-| **1 / 2 / 3** | **Flat / Gouraud / Phong** |
-| V | Interior / whole-room overview |
-| R | Reset camera |
-| F12 | Save a BMP under `screenshots/` in the working directory |
+| **1 / 2 / 3** | **Flat / Gouraud / Phong shading** |
+| V / R | Whole-room overview / reset camera |
+| **F** | Fan on/off, with acceleration and coasting |
+| **O** | Open/close the room door |
+| **C** | Open/close the folded curtains |
+| **U** | Open/close both wardrobe doors |
+| **J** | Slide the desk drawer |
+| **M** | Open/close the laptop lid |
+| **L / B / K** | Ceiling / bedside / study light |
+| **N** | Switch directly between day and night; stop automatic cycling |
+| **T** | Enable/disable the automatic day/night cycle |
+| **G** | Clear/rainy weather |
+| **P** | Pause/resume all animation, environment time and camera tour |
+| Space | Start/stop the 32-second camera tour |
+| H | Show/hide the control panel |
+| F12 | Save a BMP in `screenshots/` relative to the working directory |
 | Escape | Exit |
 
-There are no lighting, lamp or object-interaction controls. The overview hides the front wall, ceiling and attached ceiling fixtures. The camera has no collision.
+The camera remains freely movable. Manual movement, mouse look, zoom, V or R cancels the tour. Pausing freezes motion; camera navigation and direct switches such as lights still work. Repeated key events do not retrigger toggles. Overview mode hides the front wall, ceiling and ceiling fixtures.
 
-## Current scene
+## Completed features
 
-- Room with a plain floor, walls, ceiling, window/door openings and simple trim.
-- Bed with a mattress, one curved pillow and plain blanket; bedside table and a three-part lamp model.
-- Wardrobe with two simple panels and handles.
-- Tabletop with four legs; chair with a seat, backrest and four legs.
-- Laptop base and screen; bookshelf with three plain books.
-- Window, two flat curtain panels, static clock, **one** wall frame and rectangular rug.
-- Closed door, stationary ceiling fan and static ceiling-light model.
+- **Animation:** fan rotor, hinged door, opening/folding curtains with gentle sway, three clock hands, wardrobe doors, desk drawer and laptop lid.
+- **Lighting:** window daylight, ceiling and bedside point sources, and a downward study spotlight. All use ambient + diffuse + specular lighting with distance attenuation; the spotlight has a soft cone. Lamp geometry reflects each switch.
+- **Environment:** a four-minute day/night cycle, direct day/night presets, sun/moon, stars, a small exterior skyline and moving rain. Closing curtains reduces window light; rain dims daylight.
+- **Room detail:** floor pattern, padded headboard, two curved pillows, blanket drape/folds, rug border/pattern/fringe, wardrobe shelves and folded bedding, laptop keyboard/trackpad/screen graphics, books, study lamp and stationery.
+- **Presentation:** built-in control/status panel, camera tour, repeatable captures and extended runtime verification.
 
-**The plant is permanently removed and must not return.** Dustbin, study lamp, extra frame, shelf ornament, desk accessories, detailed keyboard, draped fabric and rug pattern are removed for this demo. Those non-plant details may be extended later if requested.
+The wall clock starts at 10:10 and advances one clock second per simulation second. The HUD time belongs to the accelerated environment cycle. Both stop with P. The plant remains permanently excluded.
 
-## Shading and fixed lighting
+## Suggested demonstration
 
-One fixed point light and an ambient term provide a basic ambient + diffuse + specular demonstration. There are no spotlights, attenuation calculations, toggles or dynamic light controls. The bedside lamp is geometry only; it does not emit light. The blue window backdrop uses the existing unlit shader.
+1. Press **P**, then **1 / 2 / 3** to compare the same frame in each shading mode. The curved pillows, lamps and folded curtain show the differences.
+2. Resume with **P**. Toggle **F**, **O**, **C**, **U**, **J** and **M** to show the moving parts; **V** gives an overview of the door.
+3. Press **N** for night, **L** to turn off the ceiling light, then toggle **B / K** to compare the warm bedside light and desk spotlight.
+4. Try **G** for rain and **T** for the day/night cycle. Use **Space** for a camera tour.
 
-- **Flat:** one face normal and one completed color per triangle, without color interpolation.
-- **Gouraud:** calculate lighting at vertices, then interpolate their colors.
-- **Phong:** interpolate position/normal and calculate lighting per fragment.
+![Night with bedside and study lamps](docs/screenshots/lamps.png)
 
-Use the pillow or lamp to explain the differences. All three shaders share the same light/material settings. Normal transformation still uses the inverse transpose for scaled shapes. Phong remains the default.
+## Code tour
 
-## Simple code tour
+- `src/Simulation.*` owns motion targets, light switches, weather and time. `update(dt)` advances state; rendering never changes it.
+- `src/main.cpp` handles input, camera tour, frame updates, shader selection and capture options.
+- `src/Scene.cpp` places the room objects. `src/objects/` builds their parts using parent × translation × rotation × scale.
+- `src/Lighting.cpp` uploads the same four light sources to all three shading programs.
+- `src/Primitives.*` uploads six reusable meshes once: box, rounded box, sphere, cylinder, frustum and folded curtain.
+- `src/Hud.*` batches a small built-in bitmap font into three overlay draws using a reusable buffer.
+- `src/Verification.*` tests actual framebuffer output, animation and controls.
 
-Start at `src/Scene.cpp`, which places objects, then open `src/objects/Study.cpp`. `drawTable` draws one top and four legs; `drawLaptop` draws only a base and a screen.
+**Flat** shades triangle face normals and uses noninterpolated colors. **Gouraud** computes lighting per vertex and interpolates colors. **Phong** interpolates positions/normals and computes lighting per fragment. Every path uses the same four-light equation, inverse-transpose normals and one final gamma encoding.
 
-The existing Shader, Camera, Mesh and DrawContext structure is unchanged. `Primitives.*` now contains only five shared shapes: box, rounded box, sphere, cylinder and frustum. Meshes upload their smooth and flat variants once. No new architecture or dependencies were added.
-
-See [PROJECT_PLAN.md](PROJECT_PLAN.md) for current scope, completed work and future TODOs. The richer files were staged before this refactor; staging was left untouched. At inspection there were no commits, so this is not yet a committed history checkpoint.
-
-## Verification and views
+## Verification and captures
 
 ```powershell
 .\build\smart_study_bedroom.exe --verify
 .\build\smart_study_bedroom.exe --view overview
-.\build\smart_study_bedroom.exe --view bedroom --mode flat
-.\build\smart_study_bedroom.exe --view study --capture docs/screenshots/study.bmp
+.\build\smart_study_bedroom.exe --night --rain
+.\build\smart_study_bedroom.exe --view study --mode phong --no-hud --capture docs/screenshots/study.bmp
 ```
 
-The existing verification checks shader output, camera handlers, resize, unchanged mesh uploads, OpenGL errors and a 30-second static-scene comparison. It saves BMPs using a hidden real OpenGL window. See [verification results](docs/VERIFICATION.md).
+Views: `interior`, `overview`, `bedroom`, `study`. Modes: `flat`, `gouraud`, `phong`. `--capture` renders one deterministic initial frame in a hidden real OpenGL window; `--no-hud` omits the overlay. `--shaders PATH` overrides the shader directory.
 
-Current screenshots: [Flat](docs/screenshots/Flat.png), [Gouraud](docs/screenshots/Gouraud.png), [Phong](docs/screenshots/Phong.png), [overview](docs/screenshots/overview.png), [bedroom](docs/screenshots/bedroom.png), [study](docs/screenshots/study.png).
+Verification also uses a hidden real OpenGL window. It checks independent controls against equally advanced comparison frames, all three lighting paths, frame-rate independence, limits, pause/resume, camera, resize, mesh reuse and a 30-second animated soak.
 
-## Later full version
+See [verification evidence](docs/VERIFICATION.md) and [completed project plan](PROJECT_PLAN.md). Screenshots: [overview](docs/screenshots/overview.png), [bedroom](docs/screenshots/bedroom.png), [study](docs/screenshots/study.png), [night](docs/screenshots/night.png), [rain](docs/screenshots/rain.png), [controls](docs/screenshots/controls.png).
 
-Short source TODOs cover optional richer bedding/books/desk details, curtain folds, door/fan motion and additional lighting. Clock animation, advanced interaction, weather and a day/night cycle also remain deferred until explicitly requested. Plant restoration is permanently excluded.
+## Rendering scope
+
+This is a procedural educational OpenGL scene. It has no cast-shadow maps, image textures, transparent glass, physical cloth simulation, collision detection or exterior navigation level. Those optional additions are outside this completed Phase 2 milestone. Curtain folds, bedding, artwork and the environment use geometry and material colors.
