@@ -15,9 +15,11 @@ target_include_directories(glad PUBLIC external/glad/include)
 add_executable(smart_study_bedroom
     src/main.cpp src/Shader.cpp src/Camera.cpp src/Mesh.cpp
     src/Primitives.cpp src/Lighting.cpp src/Scene.cpp src/Simulation.cpp src/Hud.cpp src/Verification.cpp src/Showcase.cpp
+    src/Screenshot.cpp src/ReportCapture.cpp
     src/objects/Room.cpp src/objects/Bedroom.cpp src/objects/Study.cpp
     src/objects/Decorations.cpp src/objects/Fixtures.cpp)
 target_include_directories(smart_study_bedroom PRIVATE src external/glm)
+target_include_directories(smart_study_bedroom SYSTEM PRIVATE external/glfw/deps)
 target_link_libraries(smart_study_bedroom PRIVATE glad glfw ${CMAKE_DL_LIBS})
 target_compile_definitions(smart_study_bedroom PRIVATE GLFW_INCLUDE_NONE)
 if(MSVC)

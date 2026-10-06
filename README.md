@@ -15,6 +15,16 @@ From the project folder in PowerShell:
 
 The build script uses the existing MSYS2 UCRT64 GCC/CMake/Ninja toolchain. Dependencies are vendored in `external/`. You can also double-click the batch files. Keep the executable and its sibling `shaders/` directory together when copying the application.
 
+## Report screenshot package
+
+Generate the complete report package with one command from PowerShell:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\capture-report.ps1
+```
+
+This builds the project, captures 29 deterministic **1920x1080 PNGs** internally, checks image/state consistency, and creates `Graphics_Project_Report_Screenshots.zip` containing only `report_screenshots/*.png`. Use `-SkipBuild` when already built, or `-PackageOnly` to validate/package existing captures. The native `.\build\smart_study_bedroom.exe --capture-report` command captures images and a state manifest without packaging. Generated report artifacts are ignored by Git. See [the image manifest, capture details and feature inventory](docs/REPORT_SCREENSHOTS.md).
+
 ## Controls
 
 Click the window to focus it. The on-screen panel shows the controls and current light/environment state; **H** shows or hides the help panel.

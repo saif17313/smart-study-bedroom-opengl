@@ -5,3 +5,5 @@
 *.user
 /screenshots/
 /docs/screenshots/*.bmp
+/report_screenshots/
+/Graphics_Project_Report_Screenshots.zip

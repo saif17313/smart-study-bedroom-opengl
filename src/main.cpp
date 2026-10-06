@@ -4,6 +4,7 @@
 #include "Scene.h"
 #include "Verification.h"
 #include "Hud.h"
+#include "ReportCapture.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
 #include <array>
@@ -130,7 +131,7 @@ void updateApplication(AppState& app, float dt) {
 }
 
 struct Options {
-    bool verify=false;
+    bool verify=false, report=false;
     bool night=false, rain=false, noHud=false;
     std::filesystem::path capture;
     std::filesystem::path shaders;
@@ -144,6 +145,7 @@ static Options parseOptions(int argc,char** argv) {
     for(int i=1;i<argc;++i) {
         const std::string arg=argv[i];
         if(arg=="--verify") result.verify=true;
+        else if(arg=="--capture-report") result.report=true;
         else if(arg=="--night") result.night=true;
         else if(arg=="--rain") result.rain=true;
         else if(arg=="--no-hud") result.noHud=true;
@@ -158,6 +160,9 @@ static Options parseOptions(int argc,char** argv) {
             else throw std::runtime_error("Mode must be flat, gouraud, or phong");
         } else throw std::runtime_error("Unknown or incomplete option: "+arg);
     }
+    if(result.report && (result.verify || !result.capture.empty() || result.night || result.rain || result.noHud
+        || result.view!="interior" || result.mode!=ShadingMode::Phong))
+        throw std::runtime_error("--capture-report defines its own states; use it separately from other scene/capture options");
     return result;
 }
 
@@ -208,7 +213,9 @@ static void runApplication(GLFWwindow* window,const Options& options) {
         drawCalls=ctx.drawCalls;
         if(app.showHud) hud.draw(unlit,app,width,height);
     };
-    if(options.verify) {
+    if(options.report) {
+        captureReport(window,app,render,"report_screenshots");
+    } else if(options.verify) {
         verifyApplication(window,app,render,"docs/screenshots");
     } else if(!options.capture.empty()) {
         render(); glFinish();
@@ -263,8 +270,9 @@ int main(int argc,char** argv) {
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,GL_TRUE);
 #endif
         glfwWindowHint(GLFW_SAMPLES,4);
-        if(options.verify || !options.capture.empty()) glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);
-        window=glfwCreateWindow(1280,900,"My Smart Study Bedroom",nullptr,nullptr);
+        if(options.verify || options.report || !options.capture.empty()) glfwWindowHint(GLFW_VISIBLE,GLFW_FALSE);
+        if(options.report) { glfwWindowHint(GLFW_SCALE_TO_MONITOR,GLFW_FALSE); glfwWindowHint(GLFW_RESIZABLE,GLFW_FALSE); }
+        window=glfwCreateWindow(options.report ? 1920 : 1280,options.report ? 1080 : 900,"My Smart Study Bedroom",nullptr,nullptr);
         if(!window) throw std::runtime_error("Cannot create an OpenGL 3.3 core window; check graphics drivers");
         glfwMakeContextCurrent(window);
         if(!gladLoadGL(glfwGetProcAddress) || !GLAD_GL_VERSION_3_3) throw std::runtime_error("GLAD cannot load OpenGL 3.3");
