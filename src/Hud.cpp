@@ -34,6 +34,7 @@ static Glyph glyph(char character) {
         case ':': return {0,4,4,0,4,4,0};
         case '/': return {1,1,2,4,8,16,16};
         case '-': return {0,0,0,31,0,0,0};
+        case '+': return {0,4,4,31,4,4,0};
         case '.': return {0,0,0,0,0,12,12};
         case '[': return {14,8,8,8,8,8,14};
         case ']': return {14,2,2,2,2,2,14};
@@ -85,15 +86,16 @@ void Hud::draw(Shader& shader,const AppState& app,int width,int height) {
     lettering(text,app.tour ? "TOUR ON  /  SPACE TO STOP" : "H CONTROLS  /  SPACE CAMERA TOUR",32,96,1.2f);
 
     if(app.showHelp) {
-        const float y=virtualHeight-270;
-        rectangle(panels,16,y,510,254);
-        rectangle(accent,16,y,3,254);
+        const float y=virtualHeight-290;
+        rectangle(panels,16,y,510,274);
+        rectangle(accent,16,y,3,274);
         lettering(accent,"ROOM CONTROLS",32,y+14,1.8f);
         const std::string lines[]={
             "WASD MOVE   Q/E HEIGHT   TAB MOUSE LOOK",
             "WHEEL ZOOM   V OVERVIEW   R CAMERA RESET",
             "1 FLAT   2 GOURAUD   3 PHONG",
-            std::string("F FAN ")+(s.fanOn ? "ON" : "OFF")+"   O DOOR "+(s.doorOpen ? "OPEN" : "CLOSED"),
+            std::string("F FAN ")+(s.fanOn ? "ON" : "OFF")+"  SPEED "+s.fanSpeedName()+"   O DOOR "+(s.doorOpen ? "OPEN" : "CLOSED"),
+            "[ / ] FAN SPEED - / +",
             std::string("C CURTAINS ")+(s.curtainsOpen ? "OPEN" : "CLOSED")+"   U WARDROBE",
             "J DESK DRAWER   M LAPTOP LID",
             "L CEILING   B BEDSIDE   K STUDY LAMP",

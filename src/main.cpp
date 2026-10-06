@@ -41,6 +41,8 @@ void handleKey(GLFWwindow* window, int key, int action) {
     if(key==GLFW_KEY_F12) app.screenshotRequested=true;
     auto& s=app.simulation;
     if(key==GLFW_KEY_F) s.fanOn=!s.fanOn;
+    if(key==GLFW_KEY_RIGHT_BRACKET) s.changeFanSpeed(1);
+    if(key==GLFW_KEY_LEFT_BRACKET) s.changeFanSpeed(-1);
     if(key==GLFW_KEY_O) s.doorOpen=!s.doorOpen;
     if(key==GLFW_KEY_C) s.curtainsOpen=!s.curtainsOpen;
     if(key==GLFW_KEY_U) s.wardrobeOpen=!s.wardrobeOpen;
@@ -195,7 +197,7 @@ static void runApplication(GLFWwindow* window,const Options& options) {
     } else {
         std::cout << "WASD move | Q/E down/up | Tab capture/release mouse | Wheel zoom\n"
                   << "1 Flat | 2 Gouraud | 3 Phong | V overview | R reset | F12 screenshot | Esc exit\n"
-                  << "F fan | O door | C curtains | U wardrobe | J drawer | M laptop\n"
+                  << "F fan | [ / ] fan speed - / + | O door | C curtains | U wardrobe | J drawer | M laptop\n"
                   << "L ceiling | B bedside | K study lamp | N day/night | T day cycle | G weather\n"
                   << "P pause | Space camera tour | H help\n";
         double lastTime=glfwGetTime();

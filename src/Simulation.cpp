@@ -2,6 +2,9 @@
 #include <algorithm>
 #include <cmath>
 
+// Degrees per second; Medium preserves the original running speed.
+static constexpr float fanSpeeds[] = {0.0f, 120.0f, 240.0f, 360.0f, 480.0f};
+
 static float approach(float value, float target, float distance) {
     return value < target ? std::min(value + distance, target) : std::max(value - distance, target);
 }
@@ -12,7 +15,7 @@ void Simulation::update(float dt) {
     clockSeconds = std::fmod(clockSeconds + dt, 86400.0);
     // A full demonstration day takes four minutes; the wall clock keeps real seconds.
     if (dayCycle) hour = std::fmod(hour + dt * 0.1, 24.0);
-    const float target = fanOn ? 240.0f : 0.0f;
+    const float target = targetFanSpeed();
     const float acceleration = 120.0f;
     const float rampTime = std::min(dt, std::abs(target - fanSpeed) / acceleration);
     const float nextSpeed = approach(fanSpeed, target, acceleration * dt);
@@ -25,6 +28,21 @@ void Simulation::update(float dt) {
     wardrobeAngle = approach(wardrobeAngle, wardrobeOpen ? 105.0f : 0.0f, 80.0f * dt);
     drawerAmount = approach(drawerAmount, drawerOpen ? 1.0f : 0.0f, 1.5f * dt);
     laptopAmount = approach(laptopAmount, laptopOpen ? 1.0f : 0.0f, 1.2f * dt);
+}
+
+void Simulation::changeFanSpeed(int delta) {
+    const int level = std::clamp((fanOn ? fanSpeedLevel : 0) + delta, 0, maxFanSpeedLevel);
+    if (level > 0) fanSpeedLevel = level;
+    fanOn = level > 0;
+}
+
+float Simulation::targetFanSpeed() const {
+    return fanSpeeds[fanOn ? fanSpeedLevel : 0];
+}
+
+const char* Simulation::fanSpeedName() const {
+    static constexpr const char* names[] = {"OFF", "LOW", "MEDIUM", "HIGH", "MAX"};
+    return names[fanOn ? fanSpeedLevel : 0];
 }
 
 void Simulation::toggleDayNight() {

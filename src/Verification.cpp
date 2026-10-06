@@ -47,6 +47,85 @@ static void require(bool passed, const char* message) {
     std::cout << "PASS: " << message << '\n';
 }
 
+static void verifyFanSpeedControls(GLFWwindow* window, AppState& app) {
+    app.simulation=Simulation{};
+    auto& s=app.simulation;
+    require(s.fanOn && s.fanSpeedLevel==2 && s.targetFanSpeed()==240,
+        "fan starts at Medium with the original target speed");
+    handleKey(window,GLFW_KEY_RIGHT_BRACKET,GLFW_PRESS);
+    require(s.fanSpeedLevel==3 && s.targetFanSpeed()==360 && s.fanSpeed==0,
+        "right bracket selects High without jumping angular velocity");
+    for(int i=0;i<20;++i) handleKey(window,GLFW_KEY_RIGHT_BRACKET,GLFW_PRESS);
+    require(s.fanSpeedLevel==4 && s.targetFanSpeed()==480,
+        "repeated right bracket presses clamp at Max");
+    s.update(0.5f);
+    require(s.fanSpeed==60 && s.fanAngle==15,"fan accelerates with the original integrated ramp");
+    s.update(10);
+    require(s.fanSpeed==480,"fan settles exactly at the maximum angular speed");
+    handleKey(window,GLFW_KEY_LEFT_BRACKET,GLFW_PRESS);
+    require(s.fanSpeedLevel==3 && s.targetFanSpeed()==360 && s.fanSpeed==480,
+        "left bracket selects High without jumping angular velocity");
+    s.update(0.5f);
+    require(s.fanSpeed==420,"lower speed selection smoothly decelerates the fan");
+    s.update(5);
+    handleKey(window,GLFW_KEY_F,GLFW_PRESS);
+    require(!s.fanOn && s.fanSpeedLevel==3 && s.targetFanSpeed()==0 && s.fanSpeed==360,
+        "F turns the fan off and remembers High without stopping instantly");
+    s.update(0.5f);
+    require(s.fanSpeed==300,"fan coasts smoothly after switching power off");
+    s.update(10);
+    const float stopped=s.fanAngle;
+    s.update(1);
+    require(s.fanSpeed==0 && s.fanAngle==stopped,"powered-off fan reaches zero and stays stopped");
+    handleKey(window,GLFW_KEY_F,GLFW_PRESS);
+    require(s.fanOn && s.fanSpeedLevel==3 && s.targetFanSpeed()==360,
+        "F restores the previously selected High speed");
+    s.update(0.5f);
+    require(s.fanSpeed==60,"restored fan smoothly accelerates again");
+    handleKey(window,GLFW_KEY_RIGHT_BRACKET,GLFW_REPEAT);
+    handleKey(window,GLFW_KEY_LEFT_BRACKET,GLFW_RELEASE);
+    require(s.fanSpeedLevel==3,"held and released bracket keys do not change speed levels");
+    for(int i=0;i<20;++i) handleKey(window,GLFW_KEY_LEFT_BRACKET,GLFW_PRESS);
+    require(!s.fanOn && s.targetFanSpeed()==0 && s.fanSpeedLevel==1 && s.fanSpeed==60,
+        "repeated left bracket presses clamp at Off and preserve Low for F");
+    handleKey(window,GLFW_KEY_F,GLFW_PRESS);
+    require(s.fanOn && s.fanSpeedLevel==1 && s.targetFanSpeed()==120,
+        "F restores Low after stepping down to Off");
+    handleKey(window,GLFW_KEY_F,GLFW_PRESS);
+    handleKey(window,GLFW_KEY_LEFT_BRACKET,GLFW_PRESS);
+    require(!s.fanOn && s.targetFanSpeed()==0,"left bracket keeps a powered-off fan at Off");
+    handleKey(window,GLFW_KEY_RIGHT_BRACKET,GLFW_PRESS);
+    require(s.fanOn && s.fanSpeedLevel==1 && s.targetFanSpeed()==120,
+        "right bracket starts a powered-off fan at Low");
+    handleKey(window,GLFW_KEY_P,GLFW_PRESS);
+    const float pausedAngle=s.fanAngle, pausedSpeed=s.fanSpeed;
+    handleKey(window,GLFW_KEY_RIGHT_BRACKET,GLFW_PRESS);
+    s.update(5);
+    require(s.targetFanSpeed()==240 && s.fanAngle==pausedAngle && s.fanSpeed==pausedSpeed,
+        "speed selection while paused changes the target and keeps motion frozen");
+    handleKey(window,GLFW_KEY_P,GLFW_PRESS);
+    s.update(0.5f);
+    require(s.fanSpeed==120,"unpause smoothly approaches the selected Medium speed");
+
+    Simulation oneStep,slow,fast;
+    oneStep.changeFanSpeed(2); slow.changeFanSpeed(2); fast.changeFanSpeed(2);
+    oneStep.update(4.5f);
+    for(int i=0;i<135;++i) slow.update(1.0f/30.0f);
+    for(int i=0;i<648;++i) fast.update(1.0f/144.0f);
+    require(std::abs(oneStep.fanAngle-120)<0.01f && std::abs(slow.fanAngle-oneStep.fanAngle)<0.05f
+        && std::abs(fast.fanAngle-oneStep.fanAngle)<0.05f
+        && slow.fanSpeed==480 && fast.fanSpeed==480,
+        "Max acceleration and constant-speed remainder agree across frame rates");
+    oneStep.changeFanSpeed(-3); slow.changeFanSpeed(-3); fast.changeFanSpeed(-3);
+    oneStep.update(3.5f);
+    for(int i=0;i<105;++i) slow.update(1.0f/30.0f);
+    for(int i=0;i<504;++i) fast.update(1.0f/144.0f);
+    require(std::abs(oneStep.fanAngle)<0.01f && std::abs(std::remainder(slow.fanAngle-oneStep.fanAngle,360.0f))<0.05f
+        && std::abs(std::remainder(fast.fanAngle-oneStep.fanAngle,360.0f))<0.05f
+        && slow.fanSpeed==120 && fast.fanSpeed==120,
+        "Max-to-Low deceleration and constant-speed remainder agree across frame rates");
+}
+
 void verifyApplication(GLFWwindow* window, AppState& app, const std::function<void()>& render,
                        const std::filesystem::path& output) {
     app.simulation=Simulation{};
@@ -94,13 +173,13 @@ void verifyApplication(GLFWwindow* window, AppState& app, const std::function<vo
     // Advance two identical scenes by the same amount, changing only the tested
     // control. This prevents clock/fan motion or HUD text from faking success.
     auto capture=[&]() { render(); glFinish(); return readFrame(width,height); };
-    auto interaction=[&](int key,const char* message,const char* screenshot) {
+    auto interaction=[&](int key,const char* message,const char* screenshot,float dt=0.8f) {
         app.simulation=Simulation{};
         app.simulation.dayCycle=false;
         auto baseline=app.simulation;
-        baseline.update(0.8f);
+        baseline.update(dt);
         handleKey(window,key,GLFW_PRESS);
-        app.simulation.update(0.8f);
+        app.simulation.update(dt);
         const auto changed=app.simulation;
         app.simulation=baseline;
         const auto before=capture();
@@ -109,7 +188,10 @@ void verifyApplication(GLFWwindow* window, AppState& app, const std::function<vo
         require(before!=after,message);
         if(screenshot) saveScreenshot(output/screenshot,width,height);
     };
+    verifyFanSpeedControls(window,app);
     interaction(GLFW_KEY_F,"fan switch changes the rendered rotor",nullptr);
+    interaction(GLFW_KEY_RIGHT_BRACKET,"increasing fan speed changes the rendered rotor",nullptr,3.0f);
+    interaction(GLFW_KEY_LEFT_BRACKET,"decreasing fan speed changes the rendered rotor",nullptr,3.0f);
     interaction(GLFW_KEY_C,"curtain movement changes geometry and daylight", "Curtains.bmp");
     interaction(GLFW_KEY_N,"day/night preset changes sky and room lighting", "Night.bmp");
     interaction(GLFW_KEY_G,"rain changes the exterior and daylight", "Rain.bmp");

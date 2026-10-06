@@ -28,6 +28,7 @@ Click the window to focus it. The on-screen panel shows the controls and current
 | **1 / 2 / 3** | **Flat / Gouraud / Phong shading** |
 | V / R | Whole-room overview / reset camera |
 | **F** | Fan on/off, with acceleration and coasting |
+| **[ / ]** | Decrease/increase fan speed by one level |
 | **O** | Open/close the room door |
 | **C** | Open/close the folded curtains |
 | **U** | Open/close both wardrobe doors |
@@ -52,6 +53,8 @@ The camera remains freely movable. Manual movement, mouse look, zoom, V or R can
 - **Environment:** a four-minute day/night cycle, direct day/night presets, sun/moon, stars, a small exterior skyline and moving rain. Closing curtains reduces window light; rain dims daylight.
 - **Room detail:** floor pattern, padded headboard, two curved pillows, blanket drape/folds, rug border/pattern/fringe, wardrobe shelves and folded bedding, laptop keyboard/trackpad/screen graphics, books, study lamp and stationery.
 - **Presentation:** built-in control/status panel, camera tour, repeatable captures and extended runtime verification.
+
+Fan levels are Off (0), Low (120), Medium (240), High (360) and Max (480 degrees/second). Medium is the default. Each bracket press changes one level, clamped between Off and Max; `]` starts an off fan at Low. `F` switches power while remembering the last non-zero level. Speed changes keep the existing smooth acceleration/coasting at 120 degrees/second squared. The help panel shows the active level; paused motion applies the new target when resumed.
 
 The wall clock starts at 10:10 and advances one clock second per simulation second. The HUD time belongs to the accelerated environment cycle. Both stop with P. The plant remains permanently excluded.
 
