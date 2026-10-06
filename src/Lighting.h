@@ -1,5 +1,6 @@
 #pragma once
 #include "Shader.h"
+#include "Simulation.h"
 
-// One fixed source for the three shading demonstrations; no lamp controls.
-void uploadLighting(Shader& shader, const glm::vec3& camera);
+// Window fill, ceiling point light, bedside point light and desk spotlight.
+void uploadLighting(Shader& shader, const glm::vec3& camera, const Simulation& simulation);

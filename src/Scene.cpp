@@ -15,6 +15,8 @@ void drawScene(DrawContext& ctx, bool overview) {
     drawTable(ctx,transform(room,{1.85f,0,-2.20f}));
     drawChair(ctx,transform(room,{1.85f,0,-1.28f},{1,1,1},-12));
     drawLaptop(ctx,transform(room,{1.60f,0.771f,-2.16f}));
+    drawStudyLamp(ctx,transform(room,{2.52f,0.771f,-2.20f}));
+    drawDeskAccessories(ctx,transform(room,{2.12f,0.773f,-2.05f}));
     drawBookshelf(ctx,transform(room,{1.85f,1.46f,-2.65f}));
     const auto window=transform(room,{-0.05f,1.775f,-2.80f});
     drawWindow(ctx,window);
