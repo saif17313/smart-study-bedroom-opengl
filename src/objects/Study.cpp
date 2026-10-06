@@ -26,8 +26,19 @@ void drawChair(DrawContext& c, const glm::mat4& p) {
 
 void drawLaptop(DrawContext& c, const glm::mat4& p) {
     drawRoundedBox(c,p,{0,0.018f,0},{0.49f,0.035f,0.32f},metal);
-    for(int row=0;row<4;++row) for(int col=0;col<10;++col)
-        drawBox(c,p,{-0.196f+col*0.0435f,0.038f,-0.09f+row*0.034f},{0.035f,0.004f,0.024f},dark);
+    constexpr float backlightIntensity=0.8f;
+    const float brightness=c.simulation.keyboardBacklightBrightness()*backlightIntensity;
+    const Material keyboardBacklight{glm::vec3(0.30f,0.44f,0.54f)*brightness,0,1,true};
+    const Material keyboardLightBed{keyboardBacklight.color*0.08f,0,1,true};
+    // Separate light layers above the base top (0.0355) and below key tops (0.040).
+    if(brightness>0)
+        drawBox(c,p,{-0.00025f,0.0357f,-0.039f},{0.432f,0.0002f,0.130f},keyboardLightBed);
+    for(int row=0;row<4;++row) for(int col=0;col<10;++col) {
+        const glm::vec3 keyPosition{-0.196f+col*0.0435f,0.038f,-0.09f+row*0.034f};
+        if(brightness>0)
+            drawBox(c,p,{keyPosition.x,0.036f,keyPosition.z},{0.0375f,0.0004f,0.0265f},keyboardBacklight);
+        drawBox(c,p,keyPosition,{0.035f,0.004f,0.024f},dark);
+    }
     drawBox(c,p,{0,0.038f,0.09f},{0.14f,0.004f,0.075f},dark);
     const auto screen=transform(p,{0,0.047f,-0.15f},{1,1,1},90-102*c.simulation.laptopAmount,{1,0,0});
     drawRoundedBox(c,screen,{0,0.15f,0},{0.49f,0.30f,0.022f},dark);

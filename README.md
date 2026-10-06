@@ -34,6 +34,7 @@ Click the window to focus it. The on-screen panel shows the controls and current
 | **U** | Open/close both wardrobe doors |
 | **J** | Slide the desk drawer |
 | **M** | Open/close the laptop lid |
+| **I** | Toggle laptop keyboard backlight; fades off as the lid closes |
 | **L / B / K** | Ceiling / bedside / study light |
 | **N** | Switch directly between day and night; stop automatic cycling |
 | **T** | Enable/disable the automatic day/night cycle |
@@ -55,6 +56,8 @@ The camera remains freely movable. Manual movement, mouse look, zoom, V or R can
 - **Presentation:** built-in control/status panel, camera tour, repeatable captures and extended runtime verification.
 
 Fan levels are Off (0), Low (120), Medium (240), High (360) and Max (480 degrees/second). Medium is the default. Each bracket press changes one level, clamped between Off and Max; `]` starts an off fan at Low. `F` switches power while remembering the last non-zero level. Speed changes keep the existing smooth acceleration/coasting at 120 degrees/second squared. The help panel shows the active level; paused motion applies the new target when resumed.
+
+The laptop keyboard has cool white/cyan backlighting beneath its normally shaded keycaps. `I` remembers the backlight preference; the light fades between 15% and 35% lid opening and stays off when closed. Thin unlit boxes share the laptop parent transform and existing key grid, with a dimmer light bed underneath. No additional scene lights or bloom are used. In `src/objects/Study.cpp`, change `keyboardBacklight`'s RGB color or `backlightIntensity` to adjust the appearance.
 
 The wall clock starts at 10:10 and advances one clock second per simulation second. The HUD time belongs to the accelerated environment cycle. Both stop with P. The plant remains permanently excluded.
 
