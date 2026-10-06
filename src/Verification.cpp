@@ -2,11 +2,14 @@
 #include "Verification.h"
 #include "Mesh.h"
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
+#include <tuple>
 #include <vector>
 
 static std::vector<unsigned char> readFrame(int width, int height) {
@@ -150,6 +153,182 @@ static void verifyKeyboardBacklightControls(GLFWwindow* window, AppState& app) {
     s.update(1);
     require(s.laptopAmount==1 && s.keyboardBacklightBrightness()==1,
         "fully reopening the laptop restores keyboard backlighting");
+}
+
+static bool sameSimulation(const Simulation& a,const Simulation& b) {
+    return std::tie(a.paused,a.fanOn,a.fanSpeedLevel,a.doorOpen,a.curtainsOpen,a.wardrobeOpen,a.drawerOpen,
+        a.laptopOpen,a.keyboardBacklightOn,a.ceilingLight,a.bedsideLight,a.studyLight,a.dayCycle,a.weather,
+        a.elapsed,a.clockSeconds,a.hour,a.fanAngle,a.fanSpeed,a.doorAngle,a.curtainAmount,a.wardrobeAngle,a.drawerAmount,a.laptopAmount)
+        ==std::tie(b.paused,b.fanOn,b.fanSpeedLevel,b.doorOpen,b.curtainsOpen,b.wardrobeOpen,b.drawerOpen,
+        b.laptopOpen,b.keyboardBacklightOn,b.ceilingLight,b.bedsideLight,b.studyLight,b.dayCycle,b.weather,
+        b.elapsed,b.clockSeconds,b.hour,b.fanAngle,b.fanSpeed,b.doorAngle,b.curtainAmount,b.wardrobeAngle,b.drawerAmount,b.laptopAmount);
+}
+static bool sameCamera(const Camera& a,const Camera& b) {
+    return a.position==b.position && a.yaw==b.yaw && a.pitch==b.pitch && a.fov==b.fov && a.overview==b.overview;
+}
+static bool sameUserState(const AppState& a,const AppState& b) {
+    return sameSimulation(a.simulation,b.simulation) && sameCamera(a.camera,b.camera) && a.shading==b.shading
+        && a.tour==b.tour && a.tourTime==b.tourTime && a.showHud==b.showHud && a.showHelp==b.showHelp && a.captured==b.captured;
+}
+static void verifyShowcase(GLFWwindow* window,AppState& app,const std::function<void()>& render,
+                           int width,int height,const std::filesystem::path& output) {
+    app=AppState{};
+    app.camera.position={0.8f,1.9f,2.2f}; app.camera.lookAt({-1.8f,0.8f,-0.45f}); app.camera.fov=59;
+    auto& original=app.simulation;
+    original.paused=true; original.fanSpeedLevel=3; original.fanSpeed=137; original.fanAngle=67;
+    original.doorOpen=true; original.doorAngle=42; original.curtainsOpen=false; original.curtainAmount=0.4f;
+    original.wardrobeOpen=true; original.wardrobeAngle=37; original.drawerOpen=true; original.drawerAmount=0.3f;
+    original.laptopOpen=false; original.laptopAmount=0.5f; original.keyboardBacklightOn=false;
+    original.ceilingLight=false; original.studyLight=false; original.weather=Weather::Rain;
+    original.hour=22.7; original.elapsed=12.25; original.clockSeconds=43800.125;
+    app.shading=ShadingMode::Gouraud; app.tour=true; app.tourTime=11.5; app.showHud=false; app.showHelp=false;
+    const AppState before=app;
+    require(ShowcaseState::duration()==109 && ShowcaseState::duration()<120,"complete showcase timeline is exactly 109 seconds");
+    handleKey(window,GLFW_KEY_Y,GLFW_PRESS);
+    handleKey(window,GLFW_KEY_Y,GLFW_REPEAT);
+    require(app.showcase.active && app.showHud && !app.simulation.paused && !app.tour,
+        "Y starts the showcase, preserves the snapshot and ignores repeated key events");
+    const AppState locked=app;
+    for(int key : {GLFW_KEY_F,GLFW_KEY_RIGHT_BRACKET,GLFW_KEY_I,GLFW_KEY_O,GLFW_KEY_R,GLFW_KEY_V,GLFW_KEY_1,GLFW_KEY_SPACE})
+        handleKey(window,key,GLFW_PRESS);
+    scrolled(window,4); mouseMoved(window,200,200);
+    require(sameUserState(app,locked),"manual scene/camera controls cannot interfere with a running showcase");
+    handleKey(window,GLFW_KEY_F12,GLFW_PRESS);
+    require(app.screenshotRequested,"F12 remains available during showcase");
+    app.screenshotRequested=false;
+    handleKey(window,GLFW_KEY_P,GLFW_PRESS);
+    const double pausedTime=app.showcase.time;
+    const AppState frozen=app;
+    updateApplication(app,30);
+    require(app.showcase.paused && app.showcase.time==pausedTime && sameUserState(app,frozen),
+        "P pauses showcase time, camera and production simulation together");
+    handleKey(window,GLFW_KEY_P,GLFW_PRESS);
+    updateApplication(app,0.5f);
+    require(app.showcase.time>pausedTime,"P resumes the showcase");
+    const double validTime=app.showcase.time;
+    for(float invalid : {0.0f,-1.0f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()})
+        updateApplication(app,invalid);
+    require(app.showcase.time==validTime,"invalid update intervals do not advance showcase time");
+    handleKey(window,GLFW_KEY_Y,GLFW_PRESS);
+    require(!app.showcase.active && sameUserState(app,before),"Y cancels immediately and restores every saved user state");
+
+    handleKey(window,GLFW_KEY_Y,GLFW_PRESS);
+    std::array<bool,17> visited{};
+    std::array<bool,8> lightMasks{};
+    std::array<bool,5> fanLevels{};
+    std::array<bool,4> fullyOpen{},fullyClosed{},intermediate{};
+    bool naturalDay=false,studySetup=false,sleeping=false,rainyNight=false,activeRoom=false;
+    bool keyboardOff=false,keyboardOn=false,cycle=false,tour=false,decelerated=false;
+    bool cameraSafe=true,cameraSmooth=true,speedsSafe=true;
+    double clockStart=-1,clockTravel=0;
+    Simulation comparison;
+    Camera comparisonCamera;
+    std::array<std::vector<unsigned char>,3> shadingFrames;
+    bool frozenComparison=true;
+    const double captureAt[]={1.5,5.5,15,25.3,34.3,46.5,55.5,61.2,67.2,73.5,81.5,87,91.5,95,101.7,105.7,107.5};
+    int nextCapture=0;
+    auto capture=[&]() { render(); glFinish(); return readFrame(width,height); };
+    while(app.showcase.active) {
+        const auto oldPosition=app.camera.position;
+        const float oldSpeed=app.simulation.fanSpeed;
+        updateApplication(app,0.05f);
+        if(!app.showcase.active) break;
+        const auto& c=app.showcase; const auto& s=app.simulation;
+        const int phase=static_cast<int>(c.phase);
+        visited[phase]=true;
+        cameraSafe &= std::isfinite(glm::length(app.camera.position)) && std::isfinite(app.camera.yaw)
+            && std::isfinite(app.camera.pitch) && app.camera.fov>=30 && app.camera.fov<=85;
+        if(!app.camera.overview) cameraSafe &= std::abs(app.camera.position.x)<3.2f && app.camera.position.y<3.1f
+            && app.camera.position.y>0.8f && std::abs(app.camera.position.z)<2.8f;
+        cameraSmooth &= glm::length(app.camera.position-oldPosition)<0.8f;
+        speedsSafe &= s.fanSpeed>=0 && s.fanSpeed<=480 && std::abs(s.fanSpeed-oldSpeed)<=6.01f;
+        const int mask=(s.ceilingLight ? 1 : 0)|(s.bedsideLight ? 2 : 0)|(s.studyLight ? 4 : 0);
+        if(c.phase==ShowcasePhase::Lights) lightMasks[mask]=true;
+        if(c.phase==ShowcasePhase::Fan) {
+            const int level=s.fanOn ? s.fanSpeedLevel : 0;
+            if(std::abs(s.fanSpeed-s.targetFanSpeed())<0.01f) fanLevels[level]=true;
+            decelerated |= s.fanOn && level==2 && s.fanSpeed>240 && s.fanSpeed<480;
+        }
+        const float motions[]={s.doorAngle/100,s.wardrobeAngle/105,s.drawerAmount,s.laptopAmount};
+        for(int i=0;i<4;++i) {
+            fullyClosed[i]=fullyClosed[i] || motions[i]==0;
+            fullyOpen[i]=fullyOpen[i] || motions[i]==1;
+            intermediate[i]=intermediate[i] || (motions[i]>0 && motions[i]<1);
+        }
+        naturalDay |= c.phase==ShowcasePhase::Day && s.daylight()>0.9f && s.curtainAmount==1 && mask==0;
+        studySetup |= c.phase==ShowcasePhase::Study && s.laptopAmount==1 && s.drawerAmount==1
+            && s.keyboardBacklightBrightness()==1 && mask==4;
+        sleeping |= c.phase==ShowcasePhase::Night && s.daylight()==0 && mask==2;
+        rainyNight |= c.phase==ShowcasePhase::Rain && s.weather==Weather::Rain && s.daylight()==0 && mask==7;
+        activeRoom |= c.phase==ShowcasePhase::Finale && s.fanSpeed==240 && s.laptopAmount==1
+            && s.keyboardBacklightBrightness()==1 && s.weather==Weather::Rain && mask==7 && s.elapsed>0;
+        keyboardOff |= c.phase==ShowcasePhase::Laptop && s.laptopAmount==1 && !s.keyboardBacklightOn;
+        keyboardOn |= c.phase==ShowcasePhase::Laptop && s.laptopAmount==1 && s.keyboardBacklightBrightness()==1;
+        cycle |= c.phase==ShowcasePhase::DayCycle && s.dayCycle && s.hour>17.65 && s.hour<17.71;
+        tour |= c.phase==ShowcasePhase::CameraTour && app.tour && app.tourTime>2;
+        if(c.phase==ShowcasePhase::Clock) {
+            if(clockStart<0) clockStart=s.clockSeconds;
+            clockTravel=s.clockSeconds-clockStart;
+        }
+        if(c.phase==ShowcasePhase::Shading) {
+            const int mode=static_cast<int>(app.shading);
+            if(shadingFrames[0].empty()) { comparison=s; comparisonCamera=app.camera; }
+            frozenComparison &= sameSimulation(s,comparison) && sameCamera(app.camera,comparisonCamera);
+            if(shadingFrames[mode].empty()) {
+                app.showHud=false; shadingFrames[mode]=capture(); app.showHud=true;
+            }
+        }
+        if(nextCapture<static_cast<int>(std::size(captureAt)) && c.time>=captureAt[nextCapture]) {
+            capture();
+            saveScreenshot(output/("Showcase-"+std::to_string(nextCapture+1)+".bmp"),width,height);
+            ++nextCapture;
+        }
+    }
+    require(!app.showcase.active && app.showcase.time==109 && sameUserState(app,before),
+        "showcase finishes at 109 seconds and restores camera, clocks, animations, shading, tour and HUD");
+    require(std::all_of(visited.begin(),visited.end(),[](bool seen) { return seen; }),"all 17 showcase phases run");
+    require(std::all_of(lightMasks.begin(),lightMasks.end(),[](bool seen) { return seen; }),"all eight indoor light combinations appear");
+    require(std::all_of(fanLevels.begin(),fanLevels.end(),[](bool seen) { return seen; }) && decelerated && speedsSafe,
+        "fan reaches Off/Low/Medium/High/Max and smoothly ramps down without exceeding its bounds");
+    require(std::all_of(fullyOpen.begin(),fullyOpen.end(),[](bool seen) { return seen; })
+        && std::all_of(fullyClosed.begin(),fullyClosed.end(),[](bool seen) { return seen; })
+        && std::all_of(intermediate.begin(),intermediate.end(),[](bool seen) { return seen; }),
+        "door, wardrobe, drawer and laptop show closed, intermediate and fully open states");
+    require(naturalDay && studySetup && sleeping && rainyNight && activeRoom,
+        "natural day, study, sleeping, rainy night and fully active room combinations appear");
+    require(keyboardOff && keyboardOn,"open laptop keyboard backlight is demonstrated both off and on");
+    require(cycle && clockTravel>4.5 && tour,"production day cycle, real clock motion and original camera tour all run");
+    require(cameraSafe && cameraSmooth,"showcase cameras stay finite, avoid room boundaries and interpolate without jumps");
+    require(frozenComparison && shadingFrames[0]!=shadingFrames[1] && shadingFrames[1]!=shadingFrames[2],
+        "all three shading paths render different pixels with identical camera, simulation and lights");
+
+    for(float cancelAt : {95.0f,102.0f,108.0f}) {
+        handleKey(window,GLFW_KEY_Y,GLFW_PRESS); updateApplication(app,cancelAt);
+        handleKey(window,GLFW_KEY_Y,GLFW_PRESS);
+        require(sameUserState(app,before),"cancelling during comparison, tour or finish restores the complete snapshot");
+    }
+    handleKey(window,GLFW_KEY_Y,GLFW_PRESS); updateApplication(app,150);
+    require(!app.showcase.active && app.showcase.time==109 && sameUserState(app,before),
+        "a long delayed frame crosses all events and still finishes at the duration limit");
+    AppState bulk,slow,fast;
+    bulk.showcase.start(bulk); slow.showcase.start(slow); fast.showcase.start(fast);
+    updateApplication(bulk,86.5f);
+    for(int i=0;i<2595;++i) updateApplication(slow,1.0f/30.0f);
+    for(int i=0;i<12456;++i) updateApplication(fast,1.0f/144.0f);
+    require(bulk.showcase.phase==slow.showcase.phase && slow.showcase.phase==fast.showcase.phase
+        && glm::length(bulk.camera.position-slow.camera.position)<0.001f && glm::length(bulk.camera.position-fast.camera.position)<0.001f
+        && std::abs(bulk.simulation.hour-slow.simulation.hour)<0.001
+        && std::abs(std::remainder(bulk.simulation.fanAngle-fast.simulation.fanAngle,360.0f))<0.1f,
+        "showcase timeline and production animation agree for bulk, 30 FPS and 144 FPS updates");
+    handleKey(window,GLFW_KEY_Y,GLFW_PRESS);
+    handleKey(window,GLFW_KEY_ESCAPE,GLFW_PRESS);
+    require(glfwWindowShouldClose(window) && !app.showcase.active && sameUserState(app,before),
+        "Escape still exits and restores the user snapshot during showcase");
+    glfwSetWindowShouldClose(window,GLFW_FALSE);
+    handleKey(window,GLFW_KEY_R,GLFW_PRESS); handleKey(window,GLFW_KEY_F,GLFW_PRESS);
+    require(!app.tour && !app.simulation.fanOn && !app.camera.overview,
+        "manual camera reset and fan control work again after showcase exits");
+    app=AppState{};
 }
 
 void verifyApplication(GLFWwindow* window, AppState& app, const std::function<void()>& render,
@@ -396,6 +575,8 @@ void verifyApplication(GLFWwindow* window, AppState& app, const std::function<vo
     require(width==480 && height==360,"HUD renders in a small framebuffer");
     saveScreenshot(output/"SmallWindow.bmp",width,height);
     glfwSetWindowSize(window,1280,900); glfwPollEvents();
+    glfwGetFramebufferSize(window,&width,&height);
+    verifyShowcase(window,app,render,width,height,output);
     app.camera.reset(); app.showHud=false;
     app.simulation=Simulation{};
     app.simulation.weather=Weather::Rain;

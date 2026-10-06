@@ -41,6 +41,7 @@ Click the window to focus it. The on-screen panel shows the controls and current
 | **G** | Clear/rainy weather |
 | **P** | Pause/resume all animation, environment time and camera tour |
 | Space | Start/stop the 32-second camera tour |
+| **Y** | Start/cancel the 109-second full project showcase |
 | H | Show/hide the control panel |
 | F12 | Save a BMP in `screenshots/` relative to the working directory |
 | Escape | Exit |
@@ -62,6 +63,8 @@ The laptop keyboard has cool white/cyan backlighting beneath its normally shaded
 The wall clock starts at 10:10 and advances one clock second per simulation second. The HUD time belongs to the accelerated environment cycle. Both stop with P. The plant remains permanently excluded.
 
 ## Suggested demonstration
+
+Press **Y** for a complete automated demonstration in **109 seconds**. It covers every animated object, each light and all eight indoor-light combinations, fan speeds, keyboard backlighting, daylight/sunset/night/rain, clock motion, the existing camera tour and a frozen Flat/Gouraud/Phong comparison. **P** pauses/resumes the showcase; **Y** cancels it. Camera/object inputs wait until manual mode returns; H, F12 and Escape remain available. Completion or cancellation restores the previous camera, simulation, shading, tour and HUD settings. See [the full timeline, inventory and camera waypoints](docs/SHOWCASE.md).
 
 1. Press **P**, then **1 / 2 / 3** to compare the same frame in each shading mode. The curved pillows, lamps and folded curtain show the differences.
 2. Resume with **P**. Toggle **F**, **O**, **C**, **U**, **J** and **M** to show the moving parts; **V** gives an overview of the door.

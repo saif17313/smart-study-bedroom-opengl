@@ -27,6 +27,7 @@ static void updateTitle(GLFWwindow* window, const AppState& app) {
     title += modeName(app.shading);
     title += app.camera.overview ? " | Overview" : " | Interior";
     title += app.simulation.paused ? " | PAUSED" : " | LIVE";
+    if(app.showcase.active) title += std::string(" | SHOWCASE: ")+ShowcaseState::phaseName(app.showcase.phase);
     title += " | H controls | 1/2/3 shading | N day/night";
     glfwSetWindowTitle(window,title.c_str());
 }
@@ -34,6 +35,17 @@ static void updateTitle(GLFWwindow* window, const AppState& app) {
 void handleKey(GLFWwindow* window, int key, int action) {
     if(action!=GLFW_PRESS) return;
     auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if(key==GLFW_KEY_Y) {
+        if(app.showcase.active) app.showcase.stop(app); else app.showcase.start(app);
+        updateTitle(window,app); return;
+    }
+    if(app.showcase.active) {
+        if(key==GLFW_KEY_ESCAPE) { app.showcase.stop(app); glfwSetWindowShouldClose(window,GLFW_TRUE); }
+        if(key==GLFW_KEY_P) app.showcase.paused=!app.showcase.paused;
+        if(key==GLFW_KEY_H) app.showHelp=!app.showHelp;
+        if(key==GLFW_KEY_F12) app.screenshotRequested=true;
+        updateTitle(window,app); return;
+    }
     if(key>=GLFW_KEY_1 && key<=GLFW_KEY_3) app.shading=static_cast<ShadingMode>(key-GLFW_KEY_1);
     if(key==GLFW_KEY_ESCAPE) glfwSetWindowShouldClose(window,GLFW_TRUE);
     if(key==GLFW_KEY_R) { app.tour=false; app.camera.reset(); }
@@ -71,7 +83,7 @@ void handleKey(GLFWwindow* window, int key, int action) {
 
 void mouseMoved(GLFWwindow* window, double x, double y) {
     auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
-    if(!app.captured) return;
+    if(!app.captured || app.showcase.active) return;
     if(app.firstMouse) { app.lastX=x; app.lastY=y; app.firstMouse=false; return; }
     app.tour=false;
     app.camera.look(static_cast<float>(x-app.lastX),static_cast<float>(app.lastY-y));
@@ -79,11 +91,13 @@ void mouseMoved(GLFWwindow* window, double x, double y) {
 }
 void scrolled(GLFWwindow* window, double y) {
     auto& app=*static_cast<AppState*>(glfwGetWindowUserPointer(window));
+    if(app.showcase.active) return;
     app.tour=false;
     app.camera.zoom(static_cast<float>(y));
 }
 
 static void processMovement(GLFWwindow* window, AppState& app, float dt) {
+    if(app.showcase.active) return;
     if(!glfwGetWindowAttrib(window,GLFW_FOCUSED)) return;
     auto pressed=[&](int key) { return glfwGetKey(window,key)==GLFW_PRESS ? 1.0f : 0.0f; };
     float ahead=pressed(GLFW_KEY_W)-pressed(GLFW_KEY_S), right=pressed(GLFW_KEY_D)-pressed(GLFW_KEY_A);
@@ -92,9 +106,7 @@ static void processMovement(GLFWwindow* window, AppState& app, float dt) {
     app.camera.move(ahead,right,up,dt);
 }
 
-void updateApplication(AppState& app, float dt) {
-    if(!std::isfinite(dt) || dt<=0) return;
-    app.simulation.update(dt);
+void updateCameraTour(AppState& app, float dt) {
     if (!app.tour || app.simulation.paused) return;
     app.tourTime=std::fmod(app.tourTime+dt,32.0);
     const glm::vec3 positions[]={{2.65f,1.85f,2.60f},{0.5f,1.8f,2.35f},
@@ -108,6 +120,13 @@ void updateApplication(AppState& app, float dt) {
     app.camera.fov=76;
     app.camera.position=glm::mix(positions[segment],positions[segment+1],t);
     app.camera.lookAt(glm::mix(targets[segment],targets[segment+1],t));
+}
+
+void updateApplication(AppState& app, float dt) {
+    if(!std::isfinite(dt) || dt<=0) return;
+    if(app.showcase.active) { app.showcase.update(app,dt); return; }
+    app.simulation.update(dt);
+    updateCameraTour(app,dt);
 }
 
 struct Options {
@@ -201,15 +220,22 @@ static void runApplication(GLFWwindow* window,const Options& options) {
                   << "F fan | [ / ] fan speed - / + | O door | C curtains | U wardrobe | J drawer | M laptop\n"
                   << "I keyboard backlight (automatic fade with laptop lid)\n"
                   << "L ceiling | B bedside | K study lamp | N day/night | T day cycle | G weather\n"
-                  << "P pause | Space camera tour | H help\n";
+                  << "P pause | Space camera tour | H help | Y automated showcase (109 seconds)\n";
         double lastTime=glfwGetTime();
         while(!glfwWindowShouldClose(window)) {
             double now=glfwGetTime();
-            const float dt=static_cast<float>(std::min(now-lastTime,0.1)); lastTime=now;
+            const float frameDt=static_cast<float>(now-lastTime);
+            const float dt=std::min(frameDt,0.1f); lastTime=now;
             glfwPollEvents(); processMovement(window,app,dt);
             int width=0,height=0; glfwGetFramebufferSize(window,&width,&height);
-            if(width<=0 || height<=0) { glfwWaitEventsTimeout(0.05); continue; }
-            updateApplication(app,dt);
+            if(width<=0 || height<=0) {
+                if(app.showcase.active) updateApplication(app,frameDt);
+                glfwWaitEventsTimeout(0.05); continue;
+            }
+            const bool wasShowcase=app.showcase.active;
+            const auto oldPhase=app.showcase.phase;
+            updateApplication(app,app.showcase.active ? frameDt : dt);
+            if(wasShowcase!=app.showcase.active || oldPhase!=app.showcase.phase) updateTitle(window,app);
             render();
             if(app.screenshotRequested) {
                 saveScreenshot(std::filesystem::path("screenshots")/(std::string(modeName(app.shading))+"-"+std::to_string(static_cast<int>(now*1000))+".bmp"),width,height);
