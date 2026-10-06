@@ -75,15 +75,24 @@ void Hud::draw(Shader& shader,const AppState& app,int width,int height) {
     auto& panels=batches[0]; auto& accent=batches[1]; auto& text=batches[2];
     rectangle(panels,16,16,510,98);
     rectangle(accent,16,16,3,98);
-    lettering(accent,std::string("SMART STUDY  /  ")+modeName(app.shading),32,30,1.8f);
+    lettering(accent,app.showcase.active ? (app.showcase.paused ? "SHOWCASE / PAUSED" : "SMART STUDY / SHOWCASE")
+        : std::string("SMART STUDY  /  ")+modeName(app.shading),32,30,1.8f);
     char time[16];
     const int minutes=static_cast<int>(s.hour*60)%1440;
     std::snprintf(time,sizeof(time),"%02d:%02d",minutes/60,minutes%60);
-    lettering(text,std::string(time)+"  "+weatherName(s.weather)+"  "+(s.paused ? "PAUSED" : "LIVE")
-        +"  CYCLE "+(s.dayCycle ? "ON" : "OFF"),32,54);
+    lettering(text,app.showcase.active ? app.showcase.label : std::string(time)+"  "+weatherName(s.weather)
+        +"  "+(s.paused ? "PAUSED" : "LIVE")+"  CYCLE "+(s.dayCycle ? "ON" : "OFF"),32,54);
     lettering(text,std::string("LIGHTS  L:")+(s.ceilingLight ? "ON" : "OFF")+"  B:"
-        +(s.bedsideLight ? "ON" : "OFF")+"  K:"+(s.studyLight ? "ON" : "OFF"),32,75);
-    lettering(text,app.tour ? "TOUR ON  /  SPACE TO STOP" : "H CONTROLS  /  SPACE CAMERA TOUR",32,96,1.2f);
+        +(s.bedsideLight ? "ON" : "OFF")+"  K:"+(s.studyLight ? "ON" : "OFF")
+        +(app.showcase.active ? std::string("  ")+time+" "+weatherName(s.weather) : ""),32,75);
+    if(app.showcase.active) {
+        char progress[80];
+        std::snprintf(progress,sizeof(progress),"%02d/%02d  %03d/%03d SEC  P PAUSE  Y CANCEL  F12 SAVE",
+            static_cast<int>(app.showcase.phase)+1,ShowcaseState::phaseCount(),
+            static_cast<int>(app.showcase.time),static_cast<int>(ShowcaseState::duration()));
+        lettering(text,progress,32,96,1.2f);
+        rectangle(accent,32,109,475*static_cast<float>(app.showcase.time/ShowcaseState::duration()),2);
+    } else lettering(text,app.tour ? "TOUR ON  /  SPACE TO STOP" : "H CONTROLS  /  SPACE CAMERA TOUR",32,96,1.2f);
 
     if(app.showHelp) {
         const float y=virtualHeight-290;
@@ -100,7 +109,7 @@ void Hud::draw(Shader& shader,const AppState& app,int width,int height) {
             std::string("J DRAWER   M LAPTOP   I KEYBOARD LIGHT ")+(s.keyboardBacklightBrightness()>0 ? "ON" : "OFF"),
             "L CEILING   B BEDSIDE   K STUDY LAMP",
             "N DAY/NIGHT   T DAY CYCLE   G RAIN/CLEAR",
-            "P PAUSE MOTION   SPACE CAMERA TOUR",
+            "P PAUSE   SPACE CAMERA TOUR   Y SHOWCASE",
             "F12 SCREENSHOT   H HIDE HELP   ESC EXIT"
         };
         for(size_t i=0;i<std::size(lines);++i) lettering(text,lines[i],32,y+42+20*float(i));
