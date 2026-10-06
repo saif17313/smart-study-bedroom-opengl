@@ -45,6 +45,12 @@ const char* Simulation::fanSpeedName() const {
     return names[fanOn ? fanSpeedLevel : 0];
 }
 
+float Simulation::keyboardBacklightBrightness() const {
+    // Fade with the animated lid; a closed or barely exposed keyboard stays dark.
+    constexpr float startOpen = 0.15f, fullyOpen = 0.35f;
+    return keyboardBacklightOn ? std::clamp((laptopAmount - startOpen) / (fullyOpen - startOpen), 0.0f, 1.0f) : 0.0f;
+}
+
 void Simulation::toggleDayNight() {
     hour = daylight() > 0.5f ? 22.0 : 10.0;
     dayCycle = false;

@@ -48,6 +48,7 @@ void handleKey(GLFWwindow* window, int key, int action) {
     if(key==GLFW_KEY_U) s.wardrobeOpen=!s.wardrobeOpen;
     if(key==GLFW_KEY_J) s.drawerOpen=!s.drawerOpen;
     if(key==GLFW_KEY_M) s.laptopOpen=!s.laptopOpen;
+    if(key==GLFW_KEY_I) s.keyboardBacklightOn=!s.keyboardBacklightOn;
     if(key==GLFW_KEY_L) s.ceilingLight=!s.ceilingLight;
     if(key==GLFW_KEY_B) s.bedsideLight=!s.bedsideLight;
     if(key==GLFW_KEY_K) s.studyLight=!s.studyLight;
@@ -198,6 +199,7 @@ static void runApplication(GLFWwindow* window,const Options& options) {
         std::cout << "WASD move | Q/E down/up | Tab capture/release mouse | Wheel zoom\n"
                   << "1 Flat | 2 Gouraud | 3 Phong | V overview | R reset | F12 screenshot | Esc exit\n"
                   << "F fan | [ / ] fan speed - / + | O door | C curtains | U wardrobe | J drawer | M laptop\n"
+                  << "I keyboard backlight (automatic fade with laptop lid)\n"
                   << "L ceiling | B bedside | K study lamp | N day/night | T day cycle | G weather\n"
                   << "P pause | Space camera tour | H help\n";
         double lastTime=glfwGetTime();

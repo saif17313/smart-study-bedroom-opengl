@@ -126,6 +126,32 @@ static void verifyFanSpeedControls(GLFWwindow* window, AppState& app) {
         "Max-to-Low deceleration and constant-speed remainder agree across frame rates");
 }
 
+static void verifyKeyboardBacklightControls(GLFWwindow* window, AppState& app) {
+    app.simulation=Simulation{};
+    auto& s=app.simulation;
+    require(s.keyboardBacklightOn && s.keyboardBacklightBrightness()==1,
+        "open laptop starts with keyboard backlighting enabled");
+    handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+    handleKey(window,GLFW_KEY_I,GLFW_REPEAT);
+    require(!s.keyboardBacklightOn && s.keyboardBacklightBrightness()==0,
+        "I disables keyboard backlighting without retriggering on repeat");
+    handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+    require(s.keyboardBacklightOn && s.laptopOpen && s.laptopAmount==1 && s.fanSpeedLevel==2
+        && s.ceilingLight && s.bedsideLight && s.studyLight,
+        "I restores keyboard lighting without changing the laptop, fan or room lights");
+    handleKey(window,GLFW_KEY_M,GLFW_PRESS);
+    s.update(1);
+    require(s.laptopAmount==0 && s.keyboardBacklightBrightness()==0 && s.keyboardBacklightOn,
+        "closing the laptop extinguishes the backlight and remembers its preference");
+    handleKey(window,GLFW_KEY_M,GLFW_PRESS);
+    s.update(0.2f);
+    const float fading=s.keyboardBacklightBrightness();
+    require(fading>0 && fading<1,"keyboard backlight fades in with the moving laptop lid");
+    s.update(1);
+    require(s.laptopAmount==1 && s.keyboardBacklightBrightness()==1,
+        "fully reopening the laptop restores keyboard backlighting");
+}
+
 void verifyApplication(GLFWwindow* window, AppState& app, const std::function<void()>& render,
                        const std::filesystem::path& output) {
     app.simulation=Simulation{};
@@ -203,6 +229,51 @@ void verifyApplication(GLFWwindow* window, AppState& app, const std::function<vo
     interaction(GLFW_KEY_J,"desk drawer slides out", "Drawer.bmp");
     app.camera.position={1.5f,1.6f,-1.0f}; app.camera.lookAt({1.6f,0.9f,-2.16f});
     interaction(GLFW_KEY_M,"laptop lid rotates around its hinge", "Laptop.bmp");
+
+    verifyKeyboardBacklightControls(window,app);
+    const glm::vec3 keyboardViews[]={{1.60f,1.45f,-1.98f},{1.62f,0.865f,-1.58f},{1.28f,1.07f,-1.87f}};
+    const char* keyboardViewNames[]={"Normal","Above","Desk","Close"};
+    for(int view=0;view<4;++view) {
+        app.camera.reset();
+        if(view>0) {
+            app.camera.position=keyboardViews[view-1];
+            app.camera.lookAt({1.60f,0.809f,-2.199f});
+            app.camera.fov=45;
+        }
+        for(int mode=0;mode<3;++mode) {
+            app.shading=static_cast<ShadingMode>(mode);
+            app.simulation=Simulation{};
+            app.simulation.keyboardBacklightOn=false;
+            const auto dark=capture();
+            if(mode==2) saveScreenshot(output/(std::string("Keyboard-")+keyboardViewNames[view]+"-Off.bmp"),width,height);
+            handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+            const auto lit=capture();
+            // The default room camera can hide the keyboard behind the chair.
+            if(view>0) require(lit!=dark,"keyboard backlight changes pixels in exposed desk views and each shading mode");
+            require(lit==capture(),"stationary keyboard backlight renders without flickering");
+            if(mode==2 || view==3)
+                saveScreenshot(output/(std::string("Keyboard-")+keyboardViewNames[view]+"-"+modeName(app.shading)+".bmp"),width,height);
+        }
+    }
+    app.camera.position={1.60f,0.79f,-1.70f}; app.camera.lookAt({1.60f,0.806f,-2.199f});
+    app.simulation.keyboardBacklightOn=false;
+    const auto underneath=capture();
+    handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+    require(underneath==capture(),"keyboard backlight is occluded when viewed below the laptop base");
+    app.camera.position=keyboardViews[2]; app.camera.lookAt({1.60f,0.809f,-2.199f});
+    app.simulation.laptopOpen=false; app.simulation.laptopAmount=0;
+    const auto closed=capture();
+    handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+    require(closed==capture(),"closed laptop has no visible keyboard backlight");
+    app.simulation=Simulation{};
+    app.simulation.hour=22; app.simulation.dayCycle=false;
+    app.simulation.ceilingLight=false; app.simulation.bedsideLight=false; app.simulation.studyLight=false;
+    app.simulation.keyboardBacklightOn=false;
+    const auto nightKeyboard=capture();
+    handleKey(window,GLFW_KEY_I,GLFW_PRESS);
+    require(nightKeyboard!=capture(),"keyboard backlight remains visible with all room lights off");
+    saveScreenshot(output/"Keyboard-Night.bmp",width,height);
+    app.camera.reset();
 
     // Each actual light must affect room pixels in every shading path, even
     // with all other lights off. Geometry-only emissive toggles are insufficient.

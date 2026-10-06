@@ -97,7 +97,7 @@ void Hud::draw(Shader& shader,const AppState& app,int width,int height) {
             std::string("F FAN ")+(s.fanOn ? "ON" : "OFF")+"  SPEED "+s.fanSpeedName()+"   O DOOR "+(s.doorOpen ? "OPEN" : "CLOSED"),
             "[ / ] FAN SPEED - / +",
             std::string("C CURTAINS ")+(s.curtainsOpen ? "OPEN" : "CLOSED")+"   U WARDROBE",
-            "J DESK DRAWER   M LAPTOP LID",
+            std::string("J DRAWER   M LAPTOP   I KEYBOARD LIGHT ")+(s.keyboardBacklightBrightness()>0 ? "ON" : "OFF"),
             "L CEILING   B BEDSIDE   K STUDY LAMP",
             "N DAY/NIGHT   T DAY CYCLE   G RAIN/CLEAR",
             "P PAUSE MOTION   SPACE CAMERA TOUR",

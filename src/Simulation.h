@@ -11,6 +11,7 @@ struct Simulation {
     bool fanOn = true, doorOpen = false, curtainsOpen = true;
     int fanSpeedLevel = 2; // Remember the last non-zero level while the fan is off.
     bool wardrobeOpen = false, drawerOpen = false, laptopOpen = true;
+    bool keyboardBacklightOn = true;
     bool ceilingLight = true, bedsideLight = true, studyLight = true;
     bool dayCycle = true;
     Weather weather = Weather::Clear;
@@ -25,6 +26,7 @@ struct Simulation {
     void changeFanSpeed(int delta);
     float targetFanSpeed() const;
     const char* fanSpeedName() const;
+    float keyboardBacklightBrightness() const;
     void toggleDayNight();
     float daylight() const;
     glm::vec3 skyColor() const;
